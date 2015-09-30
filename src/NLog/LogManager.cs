@@ -34,11 +34,13 @@
 namespace NLog
 {
     using System;
+    using System.Collections.Generic;
     using System.Diagnostics;
     using System.Globalization;
     using System.Reflection;
-    using System.Runtime.CompilerServices;
     using System.Threading;
+    using System.Runtime.CompilerServices;
+    using System.Linq;
     using Internal.Fakeables;
     using NLog.Common;
     using NLog.Config;
@@ -51,12 +53,15 @@ namespace NLog
     {
         private static readonly LogFactory factory = new LogFactory();
         private static IAppDomain currentAppDomain;
-        private static GetCultureInfo defaultCultureInfo = () => CultureInfo.CurrentCulture;
-        private static readonly System.Collections.Generic.List<System.Reflection.Assembly> _hiddenAssemblies = new System.Collections.Generic.List<System.Reflection.Assembly>();
+        private static ICollection<Assembly> _hiddenAssemblies;
+
+        private static readonly object lockObject = new object();
+
 
         /// <summary>
         /// Delegate used to set/get the culture in use.
         /// </summary>
+        [Obsolete]
         public delegate CultureInfo GetCultureInfo();
 
 #if !SILVERLIGHT && !MONO
@@ -121,6 +126,7 @@ namespace NLog
 
         /// <summary>
         /// Gets or sets the current logging configuration.
+        /// <see cref="LogFactory.Configuration" />
         /// </summary>
         public static LoggingConfiguration Configuration
         {
@@ -140,10 +146,11 @@ namespace NLog
         /// <summary>
         /// Gets or sets the default culture to use.
         /// </summary>
+        [Obsolete("Use Configuration.DefaultCultureInfo property instead")]
         public static GetCultureInfo DefaultCultureInfo
         {
-            get { return defaultCultureInfo; }
-            set { defaultCultureInfo = value; }
+            get { return () => factory.DefaultCultureInfo ?? CultureInfo.CurrentCulture; }
+            set { throw new NotSupportedException("Setting the DefaultCultureInfo delegate is no longer supported. Use the Configuration.DefaultCultureInfo property to change the default CultureInfo."); }
         }
 
         /// <summary>
@@ -159,9 +166,9 @@ namespace NLog
             return factory.GetLogger(GetClassFullName());
         }
 
-        internal static System.Reflection.Assembly[] HiddenAssemblies
+        internal static bool IsHiddenAssembly(Assembly assembly)
         {
-            get { return _hiddenAssemblies.ToArray(); }
+            return _hiddenAssemblies != null && _hiddenAssemblies.Contains(assembly);
         }
 
         /// <summary>
@@ -170,14 +177,18 @@ namespace NLog
         /// </summary>
         /// <param name="assembly">The assembly to skip.</param>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void AddHiddenAssembly(System.Reflection.Assembly assembly)
+        public static void AddHiddenAssembly(Assembly assembly)
         {
-            if (_hiddenAssemblies.Contains(assembly))
+            lock (lockObject)
             {
+                if (_hiddenAssemblies != null && _hiddenAssemblies.Contains(assembly))
                 return;
-            }
 
-            _hiddenAssemblies.Add(assembly);
+                _hiddenAssemblies = new HashSet<Assembly>(_hiddenAssemblies ?? Enumerable.Empty<Assembly>())
+                {
+                    assembly
+                };
+            }
         }
 
         /// <summary>
@@ -246,23 +257,23 @@ namespace NLog
             factory.Flush();
         }
 
-        /// <summary>
-        /// Flush any pending log messages (in case of asynchronous targets).
-        /// </summary>
-        /// <param name="timeout">Maximum time to allow for the flush. Any messages after that time will be discarded.</param>
-        public static void Flush(TimeSpan timeout)
-        {
-            factory.Flush(timeout);
-        }
+/// <summary>
+/// Flush any pending log messages (in case of asynchronous targets).
+/// </summary>
+/// <param name="timeout">Maximum time to allow for the flush. Any messages after that time will be discarded.</param>
+public static void Flush(TimeSpan timeout)
+{
+    factory.Flush(timeout);
+}
 
-        /// <summary>
-        /// Flush any pending log messages (in case of asynchronous targets).
-        /// </summary>
-        /// <param name="timeoutMilliseconds">Maximum time to allow for the flush. Any messages after that time will be discarded.</param>
-        public static void Flush(int timeoutMilliseconds)
-        {
-            factory.Flush(timeoutMilliseconds);
-        }
+/// <summary>
+/// Flush any pending log messages (in case of asynchronous targets).
+/// </summary>
+/// <param name="timeoutMilliseconds">Maximum time to allow for the flush. Any messages after that time will be discarded.</param>
+public static void Flush(int timeoutMilliseconds)
+{
+    factory.Flush(timeoutMilliseconds);
+}
 #endif
 
         /// <summary>
@@ -274,32 +285,32 @@ namespace NLog
             factory.Flush(asyncContinuation);
         }
 
-        /// <summary>
-        /// Flush any pending log messages (in case of asynchronous targets).
-        /// </summary>
-        /// <param name="asyncContinuation">The asynchronous continuation.</param>
-        /// <param name="timeout">Maximum time to allow for the flush. Any messages after that time will be discarded.</param>
-        public static void Flush(AsyncContinuation asyncContinuation, TimeSpan timeout)
-        {
-            factory.Flush(asyncContinuation, timeout);
-        }
+/// <summary>
+/// Flush any pending log messages (in case of asynchronous targets).
+/// </summary>
+/// <param name="asyncContinuation">The asynchronous continuation.</param>
+/// <param name="timeout">Maximum time to allow for the flush. Any messages after that time will be discarded.</param>
+public static void Flush(AsyncContinuation asyncContinuation, TimeSpan timeout)
+{
+    factory.Flush(asyncContinuation, timeout);
+}
 
-        /// <summary>
-        /// Flush any pending log messages (in case of asynchronous targets).
-        /// </summary>
-        /// <param name="asyncContinuation">The asynchronous continuation.</param>
-        /// <param name="timeoutMilliseconds">Maximum time to allow for the flush. Any messages after that time will be discarded.</param>
-        public static void Flush(AsyncContinuation asyncContinuation, int timeoutMilliseconds)
-        {
-            factory.Flush(asyncContinuation, timeoutMilliseconds);
-        }
+/// <summary>
+/// Flush any pending log messages (in case of asynchronous targets).
+/// </summary>
+/// <param name="asyncContinuation">The asynchronous continuation.</param>
+/// <param name="timeoutMilliseconds">Maximum time to allow for the flush. Any messages after that time will be discarded.</param>
+public static void Flush(AsyncContinuation asyncContinuation, int timeoutMilliseconds)
+{
+    factory.Flush(asyncContinuation, timeoutMilliseconds);
+}
 
         /// <summary>
         /// Decreases the log enable counter and if it reaches -1 the logs are disabled.
         /// </summary>
         /// <remarks>Logging is enabled if the number of <see cref="EnableLogging"/> calls is greater 
         ///     than or equal to <see cref="DisableLogging"/> calls.</remarks>
-        /// <returns>An object that iplements IDisposable whose Dispose() method reenables logging. 
+        /// <returns>An object that implements IDisposable whose Dispose() method reenables logging. 
         ///     To be used with C# <c>using ()</c> statement.</returns>
         public static IDisposable DisableLogging()
         {
@@ -339,6 +350,26 @@ namespace NLog
             }
         }
 
+#if !SILVERLIGHT && !MONO
+        private static void SetupTerminationEvents()
+        {
+            try
+            {
+                CurrentAppDomain.ProcessExit += TurnOffLogging;
+                CurrentAppDomain.DomainUnload += TurnOffLogging;
+            }
+            catch (Exception exception)
+            {
+                if (exception.MustBeRethrown())
+                {
+                    throw;
+                }
+
+                InternalLogger.Warn("Error setting up termination events: {0}", exception);
+            }            
+        }
+#endif
+
         /// <summary>
         /// Gets the fully qualified name of the class invoking the LogManager, including the 
         /// namespace but not the assembly.    
@@ -371,25 +402,6 @@ namespace NLog
             return className;
         }
 
-#if !SILVERLIGHT && !MONO
-        private static void SetupTerminationEvents()
-        {
-            try
-            {
-                CurrentAppDomain.ProcessExit += TurnOffLogging;
-                CurrentAppDomain.DomainUnload += TurnOffLogging;
-            }
-            catch (Exception exception)
-            {
-                if (exception.MustBeRethrown())
-                {
-                    throw;
-                }
-
-                InternalLogger.Warn("Error setting up termination events: {0}", exception);
-            }            
-        }
-
         private static void TurnOffLogging(object sender, EventArgs args)
         {
             // Reset logging configuration to null; this causes old configuration (if any) to be 
@@ -398,6 +410,5 @@ namespace NLog
             Configuration = null;
             InternalLogger.Info("Logger has been shut down.");
         }
-#endif
     }
 }

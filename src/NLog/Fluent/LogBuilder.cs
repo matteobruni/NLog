@@ -31,6 +31,8 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using NLog.Time;
@@ -134,7 +136,7 @@ namespace NLog.Fluent
         }
 
         /// <summary>
-        /// Sets the log message and parameters for formating on the logging event.
+        /// Sets the log message and parameters for formatting on the logging event.
         /// </summary>
         /// <param name="format">A composite format string.</param>
         /// <param name="arg0">The object to format.</param>
@@ -148,7 +150,7 @@ namespace NLog.Fluent
         }
 
         /// <summary>
-        /// Sets the log message and parameters for formating on the logging event.
+        /// Sets the log message and parameters for formatting on the logging event.
         /// </summary>
         /// <param name="format">A composite format string.</param>
         /// <param name="arg0">The first object to format.</param>
@@ -163,7 +165,7 @@ namespace NLog.Fluent
         }
 
         /// <summary>
-        /// Sets the log message and parameters for formating on the logging event.
+        /// Sets the log message and parameters for formatting on the logging event.
         /// </summary>
         /// <param name="format">A composite format string.</param>
         /// <param name="arg0">The first object to format.</param>
@@ -179,7 +181,7 @@ namespace NLog.Fluent
         }
 
         /// <summary>
-        /// Sets the log message and parameters for formating on the logging event.
+        /// Sets the log message and parameters for formatting on the logging event.
         /// </summary>
         /// <param name="format">A composite format string.</param>
         /// <param name="arg0">The first object to format.</param>
@@ -196,7 +198,7 @@ namespace NLog.Fluent
         }
 
         /// <summary>
-        /// Sets the log message and parameters for formating on the logging event.
+        /// Sets the log message and parameters for formatting on the logging event.
         /// </summary>
         /// <param name="format">A composite format string.</param>
         /// <param name="args">An object array that contains zero or more objects to format.</param>
@@ -210,7 +212,7 @@ namespace NLog.Fluent
         }
 
         /// <summary>
-        /// Sets the log message and parameters for formating on the logging event.
+        /// Sets the log message and parameters for formatting on the logging event.
         /// </summary>
         /// <param name="provider">An object that supplies culture-specific formatting information.</param>
         /// <param name="format">A composite format string.</param>
@@ -237,6 +239,23 @@ namespace NLog.Fluent
                 throw new ArgumentNullException("name");
 
             _logEvent.Properties[name] = value;
+            return this;
+        }
+
+        /// <summary>
+        /// Sets multiple per-event context properties on the logging event.
+        /// </summary>
+        /// <param name="properties">The properties to set.</param>
+        /// <returns></returns>
+        public LogBuilder Properties(IDictionary properties)
+        {
+            if (properties == null)
+                throw new ArgumentNullException("properties");
+
+            foreach (var key in properties.Keys)
+            {
+                _logEvent.Properties[key] = properties[key];
+            }
             return this;
         }
 

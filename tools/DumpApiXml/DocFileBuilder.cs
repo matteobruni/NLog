@@ -22,6 +22,7 @@
             { typeof(Encoding).FullName, "Encoding" },
             { "NLog.Layouts.Layout", "Layout" },
             { "NLog.Targets.Target", "Target" },
+            { "NLog.Targets.LineEndingMode", "LineEndingMode" },
             { "NLog.Conditions.ConditionExpression", "Condition" },
             { "NLog.Filters.FilterResult", "FilterResult" },
             { "NLog.Layout", "Layout" },
@@ -129,6 +130,11 @@
         private static string GetTypeName(Type type)
         {
             string simpleName;
+
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
+            {
+                type = type.GetGenericArguments()[0];
+            }
 
             if (simpleTypeNames.TryGetValue(type.FullName, out simpleName))
             {

@@ -91,6 +91,12 @@ namespace NLog.Targets
         /// </summary>
         /// <docgen category='Payload Options' order='10' />
         public bool UseBinaryEncoding { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to use a WCF service contract that is one way (fire and forget) or two way (request-reply)
+        /// </summary>
+        /// <docgen category='Connection Options' order='10' />
+        public bool UseOneWayContract { get; set; }
 #endif
 
         /// <summary>
@@ -263,7 +269,7 @@ namespace NLog.Targets
             }
 
 #if WCF_SUPPORTED
-            var client = CreateWcfLogReceiverClient();
+            var client = CreateLogReceiver();
 
             client.ProcessLogMessagesCompleted += (sender, e) =>
                 {
@@ -334,6 +340,7 @@ namespace NLog.Targets
         /// service configuration - binding and endpoint address
         /// </summary>
         /// <returns></returns>
+        [Obsolete("Ths may be removed in a future release.  Use CreateLogReceiver.")]
         protected virtual WcfLogReceiverClient CreateWcfLogReceiverClient()
         {
             WcfLogReceiverClient client;
@@ -352,11 +359,11 @@ namespace NLog.Targets
                     binding = new BasicHttpBinding();
                 }
 
-                client = new WcfLogReceiverClient(binding, new EndpointAddress(this.EndpointAddress));
+                client = new WcfLogReceiverClient(UseOneWayContract, binding, new EndpointAddress(this.EndpointAddress));
             }
             else
             {
-                client = new WcfLogReceiverClient(this.EndpointConfigurationName, new EndpointAddress(this.EndpointAddress));
+                client = new WcfLogReceiverClient(UseOneWayContract, this.EndpointConfigurationName, new EndpointAddress(this.EndpointAddress));
             }
 
             client.ProcessLogMessagesCompleted += ClientOnProcessLogMessagesCompleted;
@@ -364,12 +371,29 @@ namespace NLog.Targets
             return client;
         }
 
+        /// <summary>
+        /// Creating a new instance of IWcfLogReceiverClient
+        /// 
+        /// Inheritors can override this method and provide their own 
+        /// service configuration - binding and endpoint address
+        /// </summary>
+        /// <returns></returns>
+        protected IWcfLogReceiverClient CreateLogReceiver()
+        {
+#pragma warning disable 612, 618
+
+            return this.CreateWcfLogReceiverClient();
+
+#pragma warning restore 612, 618
+
+        }
+
         private void ClientOnProcessLogMessagesCompleted(object sender, AsyncCompletedEventArgs asyncCompletedEventArgs)
         {
             var client = sender as WcfLogReceiverClient;
             if (client != null && client.State == CommunicationState.Opened)
             {
-                ((ICommunicationObject)client).Close();
+                client.CloseCommunicationObject();
             }
         }
 #endif

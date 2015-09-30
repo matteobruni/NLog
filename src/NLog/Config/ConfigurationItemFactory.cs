@@ -31,6 +31,8 @@
 // THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
+using System.IO;
+using System.Linq;
 using NLog.Common;
 
 namespace NLog.Config
@@ -229,8 +231,48 @@ namespace NLog.Config
         /// <returns>Default factory.</returns>
         private static ConfigurationItemFactory BuildDefaultFactory()
         {
-            var factory = new ConfigurationItemFactory(typeof(ILogger).Assembly);
+            var nlogAssembly = typeof(ILogger).Assembly;
+            var factory = new ConfigurationItemFactory(nlogAssembly);
             factory.RegisterExtendedItems();
+#if !SILVERLIGHT
+
+            var assemblyLocation = Path.GetDirectoryName(new Uri(nlogAssembly.CodeBase).LocalPath);
+            if (assemblyLocation == null)
+            {
+                InternalLogger.Warn("No auto loading because Nlog.dll location is unknown");
+                return factory;
+            }
+
+            var extensionDlls = Directory.GetFiles(assemblyLocation, "NLog*.dll")
+                .Select(Path.GetFileName)
+                .Where(x => !x.Equals("NLog.dll", StringComparison.OrdinalIgnoreCase))
+                .Where(x => !x.Equals("NLog.UnitTests.dll", StringComparison.OrdinalIgnoreCase))
+                .Where(x => !x.Equals("NLog.Extended.dll", StringComparison.OrdinalIgnoreCase))
+                .Select(x => Path.Combine(assemblyLocation, x));
+
+            InternalLogger.Debug("Start auto loading, location: {0}", assemblyLocation);
+            foreach (var extensionDll in extensionDlls)
+            {
+                InternalLogger.Info("Auto loading assembly file: {0}", extensionDll);
+                var success = false;
+                try
+                {
+                    var extensionAssembly = Assembly.LoadFrom(extensionDll);
+                    factory.RegisterItemsFromAssembly(extensionAssembly);
+                    success = true;
+                }
+                catch (Exception)
+                {
+                    InternalLogger.Warn("Auto loading assembly file: {0} failed! Skipping this file.", extensionDll);
+                }
+                if (success)
+                {
+                    InternalLogger.Info("Auto loading assembly file: {0} succeeded!", extensionDll);
+                }
+
+            }
+            InternalLogger.Debug("Auto loading done");
+#endif
 
             return factory;
         }

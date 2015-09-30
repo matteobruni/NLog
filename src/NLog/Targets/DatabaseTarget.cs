@@ -90,6 +90,7 @@ namespace NLog.Targets
             this.DBProvider = "sqlserver";
             this.DBHost = ".";
             this.ConnectionStringsSettings = ConfigurationManager.ConnectionStrings;
+            this.CommandType = CommandType.Text;
         }
 
         /// <summary>
@@ -162,7 +163,7 @@ namespace NLog.Targets
         /// database connection open between the log events.
         /// </summary>
         /// <docgen category='Connection Options' order='10' />
-        [DefaultValue(true)]
+        [DefaultValue(false)]
         public bool KeepConnection { get; set; }
 
         /// <summary>
@@ -549,6 +550,7 @@ namespace NLog.Targets
             if (this.activeConnection != null)
             {
                 this.activeConnection.Close();
+                this.activeConnection.Dispose();
                 this.activeConnection = null;
                 this.activeConnectionString = null;
             }
